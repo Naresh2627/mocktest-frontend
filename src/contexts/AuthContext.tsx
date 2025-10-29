@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:3000/oauth';
+const API_BASE_URL = process.env.REACT_APP_API_URL 
+  ? `${process.env.REACT_APP_API_URL}/oauth`
+  : 'http://localhost:3000/oauth';
 
 interface User {
   id: string;

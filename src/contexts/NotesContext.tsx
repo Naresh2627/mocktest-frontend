@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:3000/api/notes';
+const API_BASE_URL = process.env.REACT_APP_API_URL 
+  ? `${process.env.REACT_APP_API_URL}/api/notes`
+  : 'http://localhost:3000/api/notes';
 
 interface Note {
   id: string;

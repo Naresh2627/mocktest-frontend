@@ -23,7 +23,8 @@ const AuthCallback: React.FC = () => {
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
         // Fetch user profile to verify token
-        const response = await axios.get('http://localhost:3000/oauth/profile');
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+        const response = await axios.get(`${apiUrl}/oauth/profile`);
         
         if (response.data.user) {
           // Redirect to notes

@@ -46,7 +46,8 @@ const Signup: React.FC = () => {
   };
 
   const handleGoogleSignup = () => {
-    window.location.href = 'http://localhost:3000/oauth/google';
+    const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+    window.location.href = `${apiUrl}/oauth/google`;
   };
 
   return (
