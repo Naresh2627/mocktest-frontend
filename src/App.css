@@ -1873,8 +1873,9 @@ Label and Category Styles */
 
 .editor-section:last-child {
   margin-bottom: 0;
-}/* Addi
-tional fixes for editor layout */
+}
+
+/* Additional fixes for editor layout */
 .editor-content {
   display: flex;
   gap: 2rem;
@@ -1943,8 +1944,9 @@ tional fixes for editor layout */
     width: 100%;
     min-width: auto;
   }
-}/* Advanc
-ed Filtering and Sorting Styles */
+}
+
+/* Advanced Filtering and Sorting Styles */
 .notes-filters {
   background: #f8f9fa;
   padding: 1.5rem;
@@ -2290,8 +2292,9 @@ body {
   }
   
 
-}/
-* Accessibility Improvements */
+}
+
+/* Accessibility Improvements */
 
 /* Focus indicators */
 *:focus {
@@ -2458,8 +2461,9 @@ button:not(:disabled):hover {
   .pagination-controls {
     gap: 1rem;
   }
-}/* Na
-vigation Styles */
+}
+
+/* Navigation Styles */
 .main-navigation {
   display: flex;
   align-items: center;
@@ -2615,8 +2619,9 @@ vigation Styles */
   .main-content {
     padding: 1rem;
   }
-}/* Landing 
-Page Styles */
+}
+
+/* Landing Page Styles */
 .landing-page {
   min-height: 100vh;
   background: var(--bg-primary);
@@ -3102,8 +3107,9 @@ Page Styles */
     width: 100%;
     max-width: 300px;
   }
-}/* Landi
-ng Page Animations */
+}
+
+/* Landing Page Animations */
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -3187,8 +3193,9 @@ ng Page Animations */
   .stat-item {
     animation: none;
   }
-}/* 
-Enhanced Filtering and Infinite Scroll Styles */
+}
+
+/* Enhanced Filtering and Infinite Scroll Styles */
 
 /* Date inputs */
 .date-input {
@@ -3364,8 +3371,9 @@ html {
   .infinite-scroll-status {
     padding: 1rem;
   }
-}/
-* Enhanced Pagination Button Styles */
+}
+
+/* Enhanced Pagination Button Styles */
 .pagination-btn.first,
 .pagination-btn.last {
   font-weight: 600;
