@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useNotes } from '../contexts/NotesContext';
+import { useLabels } from '../contexts/LabelsContext';
 
 const NoteEditor: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { fetchNote, createNote, updateNote, autoSaveNote } = useNotes();
+  const { labels, categories, fetchLabels, fetchCategories, assignLabelsToNote, assignCategoriesToNote, createLabel } = useLabels();
   
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -18,6 +20,8 @@ const NoteEditor: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState('');
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [selectedLabels, setSelectedLabels] = useState<number[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
 
   const isEditing = !!id;
 
@@ -41,10 +45,23 @@ const NoteEditor: React.FC = () => {
   );
 
   useEffect(() => {
+    const loadLabelsAndCategories = async () => {
+      try {
+        await fetchLabels();
+        await fetchCategories();
+      } catch (error) {
+        console.error('Error loading labels/categories:', error);
+      }
+    };
+    
+    loadLabelsAndCategories();
+    
     if (isEditing && id) {
       loadNote();
     }
   }, [id, isEditing]);
+
+
 
   useEffect(() => {
     if (isEditing && id && (content || title)) {
@@ -95,11 +112,30 @@ const NoteEditor: React.FC = () => {
         is_draft: publishNow ? false : isDraft
       };
 
+      let savedNote;
       if (isEditing && id) {
-        await updateNote(id, noteData);
+        savedNote = await updateNote(id, noteData);
       } else {
-        const newNote = await createNote(noteData);
-        navigate(`/notes/${newNote.id}/edit`, { replace: true });
+        savedNote = await createNote(noteData);
+        navigate(`/notes/${savedNote.id}/edit`, { replace: true });
+      }
+
+      // Assign labels and categories after saving the note
+      if (selectedLabels.length > 0) {
+        try {
+          await assignLabelsToNote(parseInt(savedNote.id), selectedLabels);
+        } catch (error) {
+          console.error('Error assigning labels:', error);
+          alert('Note saved but failed to assign labels');
+        }
+      }
+      if (selectedCategories.length > 0) {
+        try {
+          await assignCategoriesToNote(parseInt(savedNote.id), selectedCategories);
+        } catch (error) {
+          console.error('Error assigning categories:', error);
+          alert('Note saved but failed to assign categories');
+        }
       }
 
       setLastSaved(new Date());
@@ -129,10 +165,29 @@ const NoteEditor: React.FC = () => {
         is_draft: publishNow ? false : isDraft
       };
 
+      let savedNote;
       if (isEditing && id) {
-        await updateNote(id, noteData);
+        savedNote = await updateNote(id, noteData);
       } else {
-        await createNote(noteData);
+        savedNote = await createNote(noteData);
+      }
+
+      // Assign labels and categories after saving the note
+      if (selectedLabels.length > 0) {
+        try {
+          await assignLabelsToNote(parseInt(savedNote.id), selectedLabels);
+        } catch (error) {
+          console.error('Error assigning labels:', error);
+          alert('Note saved but failed to assign labels');
+        }
+      }
+      if (selectedCategories.length > 0) {
+        try {
+          await assignCategoriesToNote(parseInt(savedNote.id), selectedCategories);
+        } catch (error) {
+          console.error('Error assigning categories:', error);
+          alert('Note saved but failed to assign categories');
+        }
       }
 
       // Redirect to notes list after saving
@@ -156,7 +211,7 @@ const NoteEditor: React.FC = () => {
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       handleAddTag();
@@ -165,10 +220,7 @@ const NoteEditor: React.FC = () => {
 
 
 
-  const getShareUrl = () => {
-    // This would need to be implemented based on your public note route
-    return `${window.location.origin}/public/share-id`;
-  };
+
 
   if (loading) {
     return (
@@ -301,7 +353,7 @@ const NoteEditor: React.FC = () => {
                 placeholder="Add tag..."
                 value={tagInput}
                 onChange={(e) => setTagInput(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyDown={handleKeyDown}
                 className="tag-input"
               />
               <button onClick={handleAddTag} className="add-tag-btn">
@@ -321,6 +373,104 @@ const NoteEditor: React.FC = () => {
                   </button>
                 </span>
               ))}
+            </div>
+          </div>
+
+
+
+          {/* Labels Section */}
+          <div className="editor-section">
+            <h3>Labels ({labels.length} available)</h3>
+            {selectedLabels.length > 0 && (
+              <p style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.5rem' }}>
+                Selected: {selectedLabels.join(', ')}
+              </p>
+            )}
+            <div className="labels-selection">
+              {labels.length > 0 ? (
+                labels.map(label => (
+                  <label key={label.id} className="label-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedLabels.includes(label.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedLabels(prev => [...prev, label.id]);
+                        } else {
+                          setSelectedLabels(prev => prev.filter(id => id !== label.id));
+                        }
+                      }}
+                    />
+                    <span 
+                      className="label-display"
+                      style={{ borderColor: label.color }}
+                    >
+                      <span className="label-icon" style={{ color: label.color }}>
+                        {label.icon}
+                      </span>
+                      <span className="label-name">{label.name}</span>
+                    </span>
+                  </label>
+                ))
+              ) : (
+                <p className="no-labels">
+                  No labels available. 
+                  <button 
+                    onClick={() => navigate('/labels')}
+                    className="create-labels-link"
+                  >
+                    Create some labels
+                  </button>
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Categories Section */}
+          <div className="editor-section">
+            <h3>Categories ({categories.length} available)</h3>
+            {selectedCategories.length > 0 && (
+              <p style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.5rem' }}>
+                Selected: {selectedCategories.join(', ')}
+              </p>
+            )}
+            <div className="categories-selection">
+              {categories.length > 0 ? (
+                categories.map(category => (
+                  <label key={category.id} className="category-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedCategories.includes(category.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedCategories(prev => [...prev, category.id]);
+                        } else {
+                          setSelectedCategories(prev => prev.filter(id => id !== category.id));
+                        }
+                      }}
+                    />
+                    <span 
+                      className="category-display"
+                      style={{ borderColor: category.color }}
+                    >
+                      <span className="category-icon" style={{ color: category.color }}>
+                        {category.icon}
+                      </span>
+                      <span className="category-name">{category.name}</span>
+                    </span>
+                  </label>
+                ))
+              ) : (
+                <p className="no-categories">
+                  No categories available. 
+                  <button 
+                    onClick={() => navigate('/labels')}
+                    className="create-categories-link"
+                  >
+                    Create some categories
+                  </button>
+                </p>
+              )}
             </div>
           </div>
 

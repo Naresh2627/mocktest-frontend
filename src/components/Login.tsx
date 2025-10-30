@@ -36,6 +36,7 @@ const Login: React.FC = () => {
 
   const handleGoogleLogin = () => {
     const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+    console.log('Redirecting to Google OAuth:', `${apiUrl}/oauth/google`);
     window.location.href = `${apiUrl}/oauth/google`;
   };
 
@@ -43,9 +44,9 @@ const Login: React.FC = () => {
     <div className="auth-container">
       <div className="auth-card">
         <h2>Login</h2>
-        
+
         {error && <div className="error-message">{error}</div>}
-        
+
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label htmlFor="email">Email:</label>
@@ -58,7 +59,7 @@ const Login: React.FC = () => {
               disabled={loading}
             />
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="password">Password:</label>
             <input
@@ -70,24 +71,24 @@ const Login: React.FC = () => {
               disabled={loading}
             />
           </div>
-          
+
           <button type="submit" disabled={loading} className="auth-button">
             {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
-        
+
         <div className="divider">
           <span>OR</span>
         </div>
-        
-        <button 
-          onClick={handleGoogleLogin} 
+
+        <button
+          onClick={handleGoogleLogin}
           className="google-button"
           disabled={loading}
         >
           <span>🔍</span> Continue with Google
         </button>
-        
+
         <div className="auth-links">
           <Link to="/forgot-password">Forgot Password?</Link>
           <Link to="/signup">Don't have an account? Sign up</Link>

@@ -66,10 +66,10 @@ export const LabelsProvider: React.FC<LabelsProviderProps> = ({ children }) => {
     try {
       setLoading(true);
       const response = await axios.get(`${API_BASE_URL}/labels`);
-      setLabels(response.data.labels);
+      setLabels(response.data.labels || []);
     } catch (error: any) {
       console.error('Failed to fetch labels:', error);
-      throw error;
+      setLabels([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
@@ -79,10 +79,10 @@ export const LabelsProvider: React.FC<LabelsProviderProps> = ({ children }) => {
     try {
       setLoading(true);
       const response = await axios.get(`${API_BASE_URL}/categories`);
-      setCategories(response.data.categories);
+      setCategories(response.data.categories || []);
     } catch (error: any) {
       console.error('Failed to fetch categories:', error);
-      throw error;
+      setCategories([]); // Set empty array on error
     } finally {
       setLoading(false);
     }

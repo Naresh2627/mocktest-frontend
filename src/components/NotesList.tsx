@@ -2,19 +2,39 @@ import React, { useEffect, useState } from 'react';
 import { useNotes } from '../contexts/NotesContext';
 import { useLabels } from '../contexts/LabelsContext';
 import { useNavigate } from 'react-router-dom';
+import PerformanceMonitor from './PerformanceMonitor';
+
+interface PaginationInfo {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+  meta?: {
+    query_time?: number;
+  };
+}
 
 const NotesList: React.FC = () => {
   const { notes, loading, fetchNotes, deleteNote, stats, fetchStats } = useNotes();
-  const { labels, categories, fetchLabels, fetchCategories, assignLabelsToNote, assignCategoriesToNote } = useLabels();
+  const { labels, categories, fetchLabels, fetchCategories, fetchNotesWithLabels } = useLabels();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDrafts, setFilterDrafts] = useState('all');
   const [selectedTag, setSelectedTag] = useState('');
   const [selectedLabel, setSelectedLabel] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [showLabelModal, setShowLabelModal] = useState(false);
-  const [selectedNoteForLabels, setSelectedNoteForLabels] = useState<any>(null);
-  const [noteLabels, setNoteLabels] = useState<number[]>([]);
-  const [noteCategories, setNoteCategories] = useState<number[]>([]);
+  const [visibility, setVisibility] = useState('all');
+  const [sortBy, setSortBy] = useState('updated_at');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<PaginationInfo | null>(null);
+  const [notesWithLabels, setNotesWithLabels] = useState<any[]>([]);
+  const [infiniteScrollEnabled, setInfiniteScrollEnabled] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [hasMoreNotes, setHasMoreNotes] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -22,22 +42,94 @@ const NotesList: React.FC = () => {
     fetchStats();
     fetchLabels();
     fetchCategories();
+    loadNotesWithLabels();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
+    setCurrentPage(1); // Reset to first page when filters change
+    loadNotes();
+    loadNotesWithLabels();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, filterDrafts, selectedTag, selectedLabel, selectedCategory, visibility, sortBy, sortOrder]);
+
+  useEffect(() => {
+    if (!infiniteScrollEnabled) {
+      loadNotes();
+    }
+    loadNotesWithLabels();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage]);
+
+  // Infinite scroll effect
+  useEffect(() => {
+    if (!infiniteScrollEnabled) return;
+
+    const handleScroll = () => {
+      if (
+        window.innerHeight + document.documentElement.scrollTop
+        >= document.documentElement.offsetHeight - 1000 &&
+        hasMoreNotes &&
+        !isLoadingMore &&
+        !loading
+      ) {
+        loadNotes(true);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [infiniteScrollEnabled, hasMoreNotes, isLoadingMore, loading]);
+
+  // Reset when switching between pagination modes
+  useEffect(() => {
+    setCurrentPage(1);
     loadNotes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, filterDrafts, selectedTag, selectedLabel, selectedCategory]);
+  }, [infiniteScrollEnabled]);
 
-  const loadNotes = () => {
-    const params: any = {};
+  const loadNotes = async (isLoadMore = false) => {
+    const params = {
+      page: isLoadMore ? currentPage + 1 : currentPage,
+      limit: infiniteScrollEnabled ? 20 : 5,
+      sort_by: sortBy,
+      sort_order: sortOrder,
+      infinite_scroll: infiniteScrollEnabled,
+      ...(searchTerm && { search: searchTerm }),
+      ...(filterDrafts !== 'all' && { draft_only: filterDrafts === 'drafts' ? 'true' : 'false' }),
+      ...(selectedTag && { tag: selectedTag }),
+      ...(visibility !== 'all' && { visibility }),
+      ...(dateFrom && { date_from: dateFrom }),
+      ...(dateTo && { date_to: dateTo })
+    };
     
-    if (searchTerm) params.search = searchTerm;
-    if (filterDrafts !== 'all') params.draft_only = filterDrafts === 'drafts';
-    if (selectedTag) params.tag = selectedTag;
+    console.log('loadNotes called with params:', params);
+    console.log('currentPage state:', currentPage);
     
-    fetchNotes(params);
+    try {
+      if (isLoadMore) {
+        setIsLoadingMore(true);
+      }
+      
+      const response = await fetchNotes(params, isLoadMore);
+      console.log('fetchNotes response:', response);
+      
+      if (response && response.pagination) {
+        console.log('Setting pagination:', response.pagination);
+        setPagination(response.pagination);
+        setHasMoreNotes(response.pagination.hasNext);
+        
+        if (isLoadMore) {
+          setCurrentPage(prev => prev + 1);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load notes:', error);
+    } finally {
+      if (isLoadMore) {
+        setIsLoadingMore(false);
+      }
+    }
   };
 
   const handleDeleteNote = async (id: string, title: string) => {
@@ -66,52 +158,21 @@ const NotesList: React.FC = () => {
     return Array.from(new Set(allTags));
   };
 
-  const handleAssignLabels = (note: any) => {
-    setSelectedNoteForLabels(note);
-    setNoteLabels([]); // Reset selections
-    setNoteCategories([]); // Reset selections
-    setShowLabelModal(true);
-  };
-
-  const handleLabelToggle = (labelId: number) => {
-    setNoteLabels(prev => 
-      prev.includes(labelId) 
-        ? prev.filter(id => id !== labelId)
-        : [...prev, labelId]
-    );
-  };
-
-  const handleCategoryToggle = (categoryId: number) => {
-    setNoteCategories(prev => 
-      prev.includes(categoryId) 
-        ? prev.filter(id => id !== categoryId)
-        : [...prev, categoryId]
-    );
-  };
-
-  const handleSaveLabels = async () => {
-    if (!selectedNoteForLabels) return;
-
+  const loadNotesWithLabels = async () => {
     try {
-      await assignLabelsToNote(selectedNoteForLabels.id, noteLabels);
-      await assignCategoriesToNote(selectedNoteForLabels.id, noteCategories);
+      const filters: any = {};
+      if (selectedLabel) filters.label_id = selectedLabel;
+      if (selectedCategory) filters.category_id = selectedCategory;
+      if (searchTerm) filters.search = searchTerm;
       
-      setShowLabelModal(false);
-      setSelectedNoteForLabels(null);
-      
-      // Refresh notes to show updated labels
-      fetchNotes();
-    } catch (error: any) {
-      alert('Failed to assign labels: ' + (error.response?.data?.error || error.message));
+      const notesData = await fetchNotesWithLabels(filters);
+      setNotesWithLabels(notesData);
+    } catch (error) {
+      console.error('Failed to load notes with labels:', error);
     }
   };
 
-  const closeLabelModal = () => {
-    setShowLabelModal(false);
-    setSelectedNoteForLabels(null);
-    setNoteLabels([]);
-    setNoteCategories([]);
-  };
+
 
   if (loading) {
     return (
@@ -124,6 +185,11 @@ const NotesList: React.FC = () => {
 
   return (
     <div className="notes-container">
+      <PerformanceMonitor 
+        notesCount={notes.length}
+        loading={loading}
+        lastQueryTime={pagination?.meta?.query_time}
+      />
       <div className="notes-header">
         <h1>My Notes</h1>
         <div className="header-actions">
@@ -145,6 +211,7 @@ const NotesList: React.FC = () => {
           >
             ✏️ New Note
           </button>
+
         </div>
       </div>
 
@@ -174,62 +241,138 @@ const NotesList: React.FC = () => {
         </div>
       )}
 
-      {/* Filters */}
+      {/* Advanced Filters */}
       <div className="notes-filters">
-        <input
-          type="text"
-          placeholder="Search notes..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="search-input"
-        />
-        
-        <select 
-          value={filterDrafts} 
-          onChange={(e) => setFilterDrafts(e.target.value)}
-          className="filter-select"
-        >
-          <option value="all">All Notes</option>
-          <option value="drafts">Drafts Only</option>
-          <option value="published">Published Only</option>
-        </select>
+        <div className="filter-row">
+          <input
+            type="text"
+            placeholder="🔍 Search notes..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="search-input"
+          />
+          
+          <select 
+            value={sortBy} 
+            onChange={(e) => setSortBy(e.target.value)}
+            className="filter-select"
+            title="Sort by"
+          >
+            <option value="updated_at">📅 Last Updated</option>
+            <option value="created_at">🆕 Date Created</option>
+            <option value="title">🔤 Alphabetical</option>
+            <option value="published_at">📢 Published Date</option>
+            <option value="auto_saved_at">💾 Auto-saved</option>
+          </select>
 
-        <select 
-          value={selectedTag} 
-          onChange={(e) => setSelectedTag(e.target.value)}
-          className="filter-select"
-        >
-          <option value="">All Tags</option>
-          {getAllTags().map(tag => (
-            <option key={tag} value={tag}>{tag}</option>
-          ))}
-        </select>
+          <select 
+            value={sortOrder} 
+            onChange={(e) => setSortOrder(e.target.value)}
+            className="filter-select sort-order"
+            title="Sort order"
+          >
+            <option value="desc">⬇️ Newest First</option>
+            <option value="asc">⬆️ Oldest First</option>
+          </select>
 
-        <select 
-          value={selectedLabel} 
-          onChange={(e) => setSelectedLabel(e.target.value)}
-          className="filter-select"
-        >
-          <option value="">All Labels</option>
-          {labels.map(label => (
-            <option key={label.id} value={label.id}>
-              {label.icon} {label.name}
-            </option>
-          ))}
-        </select>
+          <label className="infinite-scroll-toggle">
+            <input
+              type="checkbox"
+              checked={infiniteScrollEnabled}
+              onChange={(e) => setInfiniteScrollEnabled(e.target.checked)}
+            />
+            ♾️ Infinite Scroll
+          </label>
+        </div>
 
-        <select 
-          value={selectedCategory} 
-          onChange={(e) => setSelectedCategory(e.target.value)}
-          className="filter-select"
-        >
-          <option value="">All Categories</option>
-          {categories.map(category => (
-            <option key={category.id} value={category.id}>
-              {category.icon} {category.name}
-            </option>
-          ))}
-        </select>
+        <div className="filter-row">
+          <select 
+            value={filterDrafts} 
+            onChange={(e) => setFilterDrafts(e.target.value)}
+            className="filter-select"
+          >
+            <option value="all">📝 All Notes</option>
+            <option value="drafts">📄 Drafts Only</option>
+            <option value="published">✅ Published Only</option>
+          </select>
+
+          <select 
+            value={visibility} 
+            onChange={(e) => setVisibility(e.target.value)}
+            className="filter-select"
+          >
+            <option value="all">👁️ All Visibility</option>
+            <option value="private">🔒 Private</option>
+            <option value="public">🌐 Public</option>
+            <option value="encrypted">🔐 Encrypted</option>
+          </select>
+
+          <select 
+            value={selectedTag} 
+            onChange={(e) => setSelectedTag(e.target.value)}
+            className="filter-select"
+          >
+            <option value="">🏷️ All Tags</option>
+            {getAllTags().map(tag => (
+              <option key={tag} value={tag}>{tag}</option>
+            ))}
+          </select>
+
+          <select 
+            value={selectedLabel} 
+            onChange={(e) => setSelectedLabel(e.target.value)}
+            className="filter-select"
+          >
+            <option value="">🎯 All Labels</option>
+            {labels.map(label => (
+              <option key={label.id} value={label.id}>
+                {label.icon} {label.name}
+              </option>
+            ))}
+          </select>
+
+          <select 
+            value={selectedCategory} 
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="filter-select"
+          >
+            <option value="">📁 All Categories</option>
+            {categories.map(category => (
+              <option key={category.id} value={category.id}>
+                {category.icon} {category.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="filter-row">
+          <input
+            type="date"
+            placeholder="From date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="date-input"
+            title="Filter from date"
+          />
+          <input
+            type="date"
+            placeholder="To date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="date-input"
+            title="Filter to date"
+          />
+          <button
+            onClick={() => {
+              setDateFrom('');
+              setDateTo('');
+            }}
+            className="clear-dates-btn"
+            title="Clear date filters"
+          >
+            🗑️ Clear Dates
+          </button>
+        </div>
       </div>
 
       {/* Notes Grid */}
@@ -246,7 +389,7 @@ const NotesList: React.FC = () => {
             </button>
           </div>
         ) : (
-          notes.map(note => (
+          (selectedLabel || selectedCategory ? notesWithLabels : notes).map(note => (
             <div key={note.id} className="note-card">
               <div className="note-header">
                 <h3 
@@ -269,9 +412,47 @@ const NotesList: React.FC = () => {
                 }
               </div>
               
+              {/* Labels Display */}
+              {note.labels && note.labels.length > 0 && (
+                <div className="note-labels">
+                  {note.labels.map((label: any) => (
+                    <span 
+                      key={label.id} 
+                      className="note-label"
+                      style={{ 
+                        borderColor: label.color,
+                        color: label.color 
+                      }}
+                    >
+                      <span className="label-icon">{label.icon}</span>
+                      <span className="label-name">{label.name}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Categories Display */}
+              {note.categories && note.categories.length > 0 && (
+                <div className="note-categories">
+                  {note.categories.map((category: any) => (
+                    <span 
+                      key={category.id} 
+                      className="note-category"
+                      style={{ 
+                        borderColor: category.color,
+                        color: category.color 
+                      }}
+                    >
+                      <span className="category-icon">{category.icon}</span>
+                      <span className="category-name">{category.name}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+              
               {note.tags && note.tags.length > 0 && (
                 <div className="note-tags">
-                  {note.tags.map(tag => (
+                  {note.tags.map((tag: string) => (
                     <span key={tag} className="tag">{tag}</span>
                   ))}
                 </div>
@@ -285,13 +466,6 @@ const NotesList: React.FC = () => {
                   }
                 </span>
                 <div className="note-actions">
-                  <button 
-                    onClick={() => handleAssignLabels(note)}
-                    className="action-btn labels"
-                    title="Assign Labels"
-                  >
-                    🏷️
-                  </button>
                   <button 
                     onClick={() => navigate(`/notes/${note.id}/edit`)}
                     className="action-btn edit"
@@ -319,92 +493,122 @@ const NotesList: React.FC = () => {
         )}
       </div>
 
-      {/* Label Assignment Modal */}
-      {showLabelModal && selectedNoteForLabels && (
-        <div className="label-modal-overlay">
-          <div className="label-modal">
-            <div className="modal-header">
-              <h3>Assign Labels to "{selectedNoteForLabels.title}"</h3>
-              <button onClick={closeLabelModal} className="close-btn">×</button>
-            </div>
-            
-            <div className="modal-content">
-              {labels.length > 0 && (
-                <div className="modal-section">
-                  <h4>Labels</h4>
-                  <div className="labels-grid">
-                    {labels.map(label => (
-                      <label key={label.id} className="label-option">
-                        <input
-                          type="checkbox"
-                          checked={noteLabels.includes(label.id)}
-                          onChange={() => handleLabelToggle(label.id)}
-                        />
-                        <span 
-                          className="label-display"
-                          style={{ borderColor: label.color }}
-                        >
-                          <span className="label-icon" style={{ color: label.color }}>
-                            {label.icon}
-                          </span>
-                          <span className="label-name">{label.name}</span>
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
 
-              {categories.length > 0 && (
-                <div className="modal-section">
-                  <h4>Categories</h4>
-                  <div className="categories-grid">
-                    {categories.map(category => (
-                      <label key={category.id} className="category-option">
-                        <input
-                          type="checkbox"
-                          checked={noteCategories.includes(category.id)}
-                          onChange={() => handleCategoryToggle(category.id)}
-                        />
-                        <span 
-                          className="category-display"
-                          style={{ borderColor: category.color }}
-                        >
-                          <span className="category-icon" style={{ color: category.color }}>
-                            {category.icon}
-                          </span>
-                          <span className="category-name">{category.name}</span>
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
 
-              {labels.length === 0 && categories.length === 0 && (
-                <div className="no-labels-message">
-                  <p>No labels or categories available.</p>
-                  <button 
-                    onClick={() => navigate('/labels')}
-                    className="create-labels-btn"
-                  >
-                    Create Labels & Categories
-                  </button>
-                </div>
-              )}
-            </div>
-            
-            <div className="modal-actions">
-              <button onClick={handleSaveLabels} className="save-btn">
-                Save Labels
-              </button>
-              <button onClick={closeLabelModal} className="cancel-btn">
-                Cancel
-              </button>
-            </div>
+      {/* Debug Info */}
+      <div className="debug-info" style={{ padding: '10px', background: '#f0f0f0', margin: '10px 0', fontSize: '12px' }}>
+        <p>Debug: infiniteScrollEnabled = {infiniteScrollEnabled.toString()}</p>
+        <p>Debug: currentPage = {currentPage}</p>
+        <p>Debug: pagination = {pagination ? JSON.stringify(pagination) : 'null'}</p>
+        <p>Debug: notes.length = {notes.length}</p>
+        <div style={{ marginTop: '10px' }}>
+          <button 
+            onClick={() => {
+              console.log('Test button clicked, current page:', currentPage);
+              setCurrentPage(prev => prev + 1);
+            }}
+            style={{ marginRight: '10px', padding: '5px 10px' }}
+          >
+            Test +1 Page
+          </button>
+          <button 
+            onClick={() => {
+              console.log('Reset button clicked');
+              setCurrentPage(1);
+            }}
+            style={{ padding: '5px 10px' }}
+          >
+            Reset to Page 1
+          </button>
+        </div>
+      </div>
+
+      {/* Pagination Controls */}
+      {!infiniteScrollEnabled && pagination && (
+        <div className="pagination">
+          <div className="pagination-info">
+            Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} notes
+          </div>
+          <div className="pagination-controls">
+            <button 
+              onClick={() => {
+                console.log('First button clicked, setting page to 1');
+                setCurrentPage(1);
+              }}
+              disabled={currentPage <= 1}
+              className="pagination-btn first"
+              title="First page"
+            >
+              « First
+            </button>
+            <button 
+              onClick={() => {
+                console.log('Previous button clicked, current page:', currentPage, 'going to:', currentPage - 1);
+                if (currentPage > 1) {
+                  setCurrentPage(currentPage - 1);
+                }
+              }}
+              disabled={currentPage <= 1}
+              className="pagination-btn previous"
+              title="Previous page"
+            >
+              ‹ Previous
+            </button>
+            <span className="pagination-current">
+              Page {currentPage} of {pagination.totalPages} (API: {pagination.page})
+            </span>
+            <button 
+              onClick={() => {
+                console.log('Next button clicked, current page:', currentPage, 'going to:', currentPage + 1);
+                if (currentPage < pagination.totalPages) {
+                  setCurrentPage(currentPage + 1);
+                }
+              }}
+              disabled={currentPage >= pagination.totalPages}
+              className="pagination-btn next"
+              title="Next page"
+            >
+              Next ›
+            </button>
+            <button 
+              onClick={() => {
+                console.log('Last button clicked, setting page to:', pagination.totalPages);
+                setCurrentPage(pagination.totalPages);
+              }}
+              disabled={currentPage >= pagination.totalPages}
+              className="pagination-btn last"
+              title="Last page"
+            >
+              Last »
+            </button>
           </div>
         </div>
       )}
+
+      {/* Infinite Scroll Loading */}
+      {infiniteScrollEnabled && (
+        <div className="infinite-scroll-status">
+          {isLoadingMore && (
+            <div className="loading-more">
+              <div className="loading-spinner"></div>
+              <p>Loading more notes...</p>
+            </div>
+          )}
+          {!hasMoreNotes && notes.length > 0 && (
+            <div className="no-more-notes">
+              <p>🎉 You've reached the end! No more notes to load.</p>
+            </div>
+          )}
+          {pagination && (
+            <div className="infinite-scroll-info">
+              Loaded {notes.length} of {pagination.total} notes
+            </div>
+          )}
+        </div>
+      )}
+
+
+
     </div>
   );
 };

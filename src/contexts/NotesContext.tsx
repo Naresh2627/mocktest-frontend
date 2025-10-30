@@ -20,12 +20,45 @@ interface Note {
   auto_saved_at?: string;
 }
 
+interface FetchNotesParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  tag?: string;
+  draft_only?: string;
+  sort_by?: string;
+  sort_order?: string;
+  visibility?: string;
+  label_id?: string;
+  category_id?: string;
+  date_from?: string;
+  date_to?: string;
+  infinite_scroll?: boolean;
+}
+
+interface PaginationInfo {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+  meta?: {
+    query_time?: number;
+  };
+}
+
+interface NotesResponse {
+  notes: Note[];
+  pagination: PaginationInfo;
+}
+
 interface NotesContextType {
   notes: Note[];
   loading: boolean;
   currentNote: Note | null;
   stats: any;
-  fetchNotes: (params?: any) => Promise<void>;
+  fetchNotes: (params?: FetchNotesParams, isLoadMore?: boolean) => Promise<NotesResponse>;
   fetchNote: (id: string) => Promise<Note>;
   createNote: (noteData: Partial<Note>) => Promise<Note>;
   updateNote: (id: string, noteData: Partial<Note>) => Promise<Note>;
@@ -56,19 +89,30 @@ export const NotesProvider: React.FC<NotesProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState(null);
 
-  const fetchNotes = async (params = {}) => {
+  const fetchNotes = async (params: FetchNotesParams = {}, isLoadMore = false): Promise<NotesResponse> => {
     try {
-      setLoading(true);
-      console.log('Fetching notes with params:', params);
-      const queryParams = new URLSearchParams(params).toString();
+      if (!isLoadMore) {
+        setLoading(true);
+      }
+      
+      const queryParams = new URLSearchParams(params as any).toString();
       const url = `${API_BASE_URL}?${queryParams}`;
-      console.log('API URL:', url);
+      
       const response = await axios.get(url);
-      console.log('Notes response:', response.data);
-      setNotes(response.data.notes);
+      
+      if (response.data && response.data.notes) {
+        if (isLoadMore) {
+          // Append notes for infinite scroll
+          setNotes(prev => [...prev, ...response.data.notes]);
+        } else {
+          // Replace notes for new search/filter
+          setNotes(response.data.notes);
+        }
+      }
+      
+      return response.data; // Return full response including pagination
     } catch (error: any) {
       console.error('Failed to fetch notes:', error);
-      console.error('Error details:', error.response?.data);
       throw error;
     } finally {
       setLoading(false);
