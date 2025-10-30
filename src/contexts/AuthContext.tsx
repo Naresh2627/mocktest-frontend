@@ -1,6 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axios from 'axios';
 
+// Configure axios defaults
+axios.defaults.timeout = 10000; // 10 second timeout
+axios.defaults.withCredentials = true;
+
 const API_BASE_URL = process.env.REACT_APP_API_URL 
   ? `${process.env.REACT_APP_API_URL}/oauth`
   : 'http://localhost:3000/oauth';
@@ -72,18 +76,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string) => {
     try {
+      console.log('Attempting login to:', `${API_BASE_URL}/login`);
       const response = await axios.post(`${API_BASE_URL}/login`, {
         email,
         password,
       });
 
+      console.log('Login response:', response.data);
       const { token, user: userData } = response.data;
       
       localStorage.setItem('authToken', token);
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       setUser(userData);
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Login failed');
+      console.error('Login error:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      throw new Error(error.response?.data?.error || 'Login failed - check console for details');
     }
   };
 

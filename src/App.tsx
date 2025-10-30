@@ -14,6 +14,7 @@ import NotesList from './components/NotesList';
 import NoteEditor from './components/NoteEditor';
 import PublicNote from './components/PublicNote';
 import LabelsManager from './components/LabelsManager';
+import DebugInfo from './components/DebugInfo';
 import './App.css';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -115,6 +116,7 @@ function App() {
               />
             </Routes>
           </div>
+          {process.env.NODE_ENV !== 'production' && <DebugInfo />}
         </Router>
         </LabelsProvider>
       </NotesProvider>
