@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNotes } from '../contexts/NotesContext';
 import { useLabels } from '../contexts/LabelsContext';
 import { useNavigate } from 'react-router-dom';
-import PerformanceMonitor from './PerformanceMonitor';
+
 
 interface PaginationInfo {
   page: number;
@@ -185,33 +185,16 @@ const NotesList: React.FC = () => {
 
   return (
     <div className="notes-container">
-      <PerformanceMonitor 
-        notesCount={notes.length}
-        loading={loading}
-        lastQueryTime={pagination?.meta?.query_time}
-      />
+
       <div className="notes-header">
         <h1>My Notes</h1>
         <div className="header-actions">
-          <button 
-            onClick={() => navigate('/labels')} 
-            className="labels-btn"
-          >
-            🏷️ Manage Labels
-          </button>
-          <button 
-            onClick={() => navigate('/dashboard')} 
-            className="dashboard-btn"
-          >
-            📊 Dashboard
-          </button>
           <button 
             onClick={() => navigate('/notes/new')} 
             className="create-note-btn"
           >
             ✏️ New Note
           </button>
-
         </div>
       </div>
 
@@ -241,7 +224,7 @@ const NotesList: React.FC = () => {
         </div>
       )}
 
-      {/* Advanced Filters */}
+      {/* Simple Filters */}
       <div className="notes-filters">
         <div className="filter-row">
           <input
@@ -256,122 +239,21 @@ const NotesList: React.FC = () => {
             value={sortBy} 
             onChange={(e) => setSortBy(e.target.value)}
             className="filter-select"
-            title="Sort by"
           >
-            <option value="updated_at">📅 Last Updated</option>
-            <option value="created_at">🆕 Date Created</option>
-            <option value="title">🔤 Alphabetical</option>
-            <option value="published_at">📢 Published Date</option>
-            <option value="auto_saved_at">💾 Auto-saved</option>
+            <option value="updated_at">Last Updated</option>
+            <option value="created_at">Date Created</option>
+            <option value="title">Alphabetical</option>
           </select>
 
-          <select 
-            value={sortOrder} 
-            onChange={(e) => setSortOrder(e.target.value)}
-            className="filter-select sort-order"
-            title="Sort order"
-          >
-            <option value="desc">⬇️ Newest First</option>
-            <option value="asc">⬆️ Oldest First</option>
-          </select>
-
-          <label className="infinite-scroll-toggle">
-            <input
-              type="checkbox"
-              checked={infiniteScrollEnabled}
-              onChange={(e) => setInfiniteScrollEnabled(e.target.checked)}
-            />
-            ♾️ Infinite Scroll
-          </label>
-        </div>
-
-        <div className="filter-row">
           <select 
             value={filterDrafts} 
             onChange={(e) => setFilterDrafts(e.target.value)}
             className="filter-select"
           >
-            <option value="all">📝 All Notes</option>
-            <option value="drafts">📄 Drafts Only</option>
-            <option value="published">✅ Published Only</option>
+            <option value="all">All Notes</option>
+            <option value="drafts">Drafts</option>
+            <option value="published">Published</option>
           </select>
-
-          <select 
-            value={visibility} 
-            onChange={(e) => setVisibility(e.target.value)}
-            className="filter-select"
-          >
-            <option value="all">👁️ All Visibility</option>
-            <option value="private">🔒 Private</option>
-            <option value="public">🌐 Public</option>
-            <option value="encrypted">🔐 Encrypted</option>
-          </select>
-
-          <select 
-            value={selectedTag} 
-            onChange={(e) => setSelectedTag(e.target.value)}
-            className="filter-select"
-          >
-            <option value="">🏷️ All Tags</option>
-            {getAllTags().map(tag => (
-              <option key={tag} value={tag}>{tag}</option>
-            ))}
-          </select>
-
-          <select 
-            value={selectedLabel} 
-            onChange={(e) => setSelectedLabel(e.target.value)}
-            className="filter-select"
-          >
-            <option value="">🎯 All Labels</option>
-            {labels.map(label => (
-              <option key={label.id} value={label.id}>
-                {label.icon} {label.name}
-              </option>
-            ))}
-          </select>
-
-          <select 
-            value={selectedCategory} 
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="filter-select"
-          >
-            <option value="">📁 All Categories</option>
-            {categories.map(category => (
-              <option key={category.id} value={category.id}>
-                {category.icon} {category.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="filter-row">
-          <input
-            type="date"
-            placeholder="From date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="date-input"
-            title="Filter from date"
-          />
-          <input
-            type="date"
-            placeholder="To date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            className="date-input"
-            title="Filter to date"
-          />
-          <button
-            onClick={() => {
-              setDateFrom('');
-              setDateTo('');
-            }}
-            className="clear-dates-btn"
-            title="Clear date filters"
-          >
-            🗑️ Clear Dates
-          </button>
         </div>
       </div>
 
@@ -495,33 +377,7 @@ const NotesList: React.FC = () => {
 
 
 
-      {/* Debug Info */}
-      <div className="debug-info" style={{ padding: '10px', background: '#f0f0f0', margin: '10px 0', fontSize: '12px' }}>
-        <p>Debug: infiniteScrollEnabled = {infiniteScrollEnabled.toString()}</p>
-        <p>Debug: currentPage = {currentPage}</p>
-        <p>Debug: pagination = {pagination ? JSON.stringify(pagination) : 'null'}</p>
-        <p>Debug: notes.length = {notes.length}</p>
-        <div style={{ marginTop: '10px' }}>
-          <button 
-            onClick={() => {
-              console.log('Test button clicked, current page:', currentPage);
-              setCurrentPage(prev => prev + 1);
-            }}
-            style={{ marginRight: '10px', padding: '5px 10px' }}
-          >
-            Test +1 Page
-          </button>
-          <button 
-            onClick={() => {
-              console.log('Reset button clicked');
-              setCurrentPage(1);
-            }}
-            style={{ padding: '5px 10px' }}
-          >
-            Reset to Page 1
-          </button>
-        </div>
-      </div>
+
 
       {/* Pagination Controls */}
       {!infiniteScrollEnabled && pagination && (
